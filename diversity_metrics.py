@@ -10,6 +10,10 @@ import dotenv
 
 dotenv.load_dotenv(".env")
 
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 from sentence_transformers import SentenceTransformer
 
 # Load an extremely efficient local model for retrieval

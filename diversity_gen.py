@@ -28,6 +28,9 @@ class DataCreator(dspy.Signature):
     requirement: str = dspy.InputField(desc="Hard requirements for the new generated instances")
     generated_instances: List[str] = dspy.OutputField(desc="A list of generated data instances that are sufficiently different from existing data")
 
+# class Rewriter(dspy.Signature):
+#     """Given example data points, generated data points meant to be similar to example data points but """
+
 class DiverseDataGenerator(dspy.Module):
     def __init__(self, examples, hard_requirement, callbacks=None):
         super().__init__(callbacks)

@@ -12,14 +12,15 @@ dotenv.load_dotenv(".env")
 
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 
 from sentence_transformers import SentenceTransformer
 
 # Load an extremely efficient local model for retrieval
-# model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cpu")
+# model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+model = SentenceTransformer("AnnaWegmann/Style-Embedding", device="cuda")
 
-# embedder = dspy.Embedder(model.encode)
+style_embedder = dspy.Embedder(model.encode)
 
 embedder = dspy.Embedder("openai/text-embedding-3-small")
 def negative_cosine_sim(sents):
@@ -29,6 +30,13 @@ def negative_cosine_sim(sents):
     denom = ((cos_sim.size) - len(cos_sim)) // 2
     cos_sim = (np.sum(cos_sim) / 2) / denom
     return -cos_sim
+
+def style_cosine_sim(reference, preds):
+    ref_embeddings = style_embedder(reference)
+    pred_embeddings = style_embedder(preds)
+    cos_sim = cosine_similarity(ref_embeddings, pred_embeddings)
+    cos_sim = np.mean(cos_sim)
+    return cos_sim
     
 def cosine_sim(reference, preds):
     ref_embeddings = embedder(reference)
@@ -63,11 +71,13 @@ if __name__ == "__main__":
             all_examples.append(curr_example)
     print(dc_score(all_examples))
     print(negative_cosine_sim(all_examples))
+    print(style_cosine_sim(all_examples, all_examples))
     
-    all_gen_data = json.load(open("generated_data.json"))[:15]
-    print(dc_score(all_gen_data))
-    print(negative_cosine_sim(all_gen_data))
+    # all_gen_data = json.load(open("generated_data.json"))[:15]
+    # print(dc_score(all_gen_data))
+    # print(negative_cosine_sim(all_gen_data))
     
-    print(dc_score(all_examples + all_gen_data))
-    print(negative_cosine_sim(all_examples + all_gen_data))
+    
+    # print(dc_score(all_examples + all_gen_data))
+    # print(negative_cosine_sim(all_examples + all_gen_data))
     

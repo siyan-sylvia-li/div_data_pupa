@@ -12,12 +12,31 @@ import copy
 import pandas
 from data_quality_judges import DataQualityJudge
 
+import copy
+from copy import deepcopy
+
+class SharedList(list):
+    """
+    A list subclass that prevents itself from being deep-copied.
+    
+    Instead of creating a new copy, it returns a reference to itself,
+    ensuring all objects that "copy" it continue to share the
+    same list instance.
+    """
+    def __deepcopy__(self, memo):
+        # 'memo' is a dictionary used by deepcopy to track
+        # already-copied objects.
+        
+        # We simply return 'self' to signal that the "copy"
+        # is just the original object.
+        return self
+
 random.seed(42)
 
 dotenv.load_dotenv(".env")
 
 class ExampleSummarizer(dspy.Signature):
-    """Given a list of example data points for a dataset, provide a brief summary of these examples. Be comprehensive in your summary but additionally concise. The summary should be at most 3 sentences."""
+    """Given a list of example data points for a dataset, provide a brief summary of these examples. If there are no examples, your summary should be \"No data has been generated yet\". Be comprehensive in your summary but additionally concise. The summary should be at most 3 sentences."""
     example_list: List[str] = dspy.InputField(desc="The list of examples")
     summary: str = dspy.OutputField(desc="The summary of existing examples")
     
@@ -28,8 +47,12 @@ class DataCreator(dspy.Signature):
     requirement: str = dspy.InputField(desc="Hard requirements for the new generated instances")
     generated_instances: List[str] = dspy.OutputField(desc="A list of generated data instances that are sufficiently different from existing data")
 
-# class Rewriter(dspy.Signature):
-#     """Given example data points, generated data points meant to be similar to example data points but """
+class Rewriter(dspy.Signature):
+    """You are provided example data points, generated data points meant to be similar to example data points but not substantial copies, as well as hard requirements the generated data points must follow. Rewrite the generated data points in accordance with the hard requirements."""
+    examples: List[str] = dspy.InputField(desc="Example data instances")
+    requirement: str = dspy.InputField(desc="Hard requirements for the new generated instances")
+    generated_instances: List[str] = dspy.InputField(desc="A list of generated data instances that are sufficiently different from existing data")
+    rewritten_instances: List[str] = dspy.OutputField(desc="The rewritten generated data points")
 
 class DiverseDataGenerator(dspy.Module):
     def __init__(self, examples, hard_requirement, callbacks=None):
@@ -67,11 +90,11 @@ class OptDiverseDataGenerator(dspy.Module):
         self.data_summary = None
         self.summarizer = dspy.ChainOfThought(ExampleSummarizer)
         self.proposer = dspy.ChainOfThought(DataCreator)
+        self.rewriter = dspy.ChainOfThought(Rewriter)
         
 
     def forward(self, gold_examples, hard_requirement):
-        if len(self.generated_data):
-            self.data_summary = self.summarizer(example_list=self.generated_data).summary
+        self.data_summary = self.summarizer(example_list=self.generated_data).summary
         self.seen_examples.extend(gold_examples)
         
         generations = self.proposer(
@@ -80,12 +103,29 @@ class OptDiverseDataGenerator(dspy.Module):
             requirement=hard_requirement
         ).generated_instances
         
+        generations = self.rewriter(
+            examples=gold_examples,
+            requirement=hard_requirement,
+            generated_instances=generations
+        ).rewritten_instances
+        
         self.generated_data.extend(generations)
+        print(self.generated_data)
         return dspy.Prediction(
             generated_data=list(set(self.generated_data)),
             seen_data=list(set(self.seen_examples)),
             curr_gens=generations
         )
+    
+    def __deepcopy__(self, memo):
+        copy = type(self)()
+        memo[id(self)] = copy
+        copy.seen_examples.extend(self.seen_examples)
+        copy.generated_data.extend(self.generated_data)
+        copy.data_summary = self.data_summary
+        copy.summarizer = deepcopy(self.summarizer, memo)
+        copy.proposer = deepcopy(self.proposer, memo)
+        return copy
 
 
 

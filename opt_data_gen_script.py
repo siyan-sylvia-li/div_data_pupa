@@ -1,9 +1,10 @@
 # %%
 import dspy
 
+
 from diversity_gen import OptDiverseDataGenerator
 import pandas
-from diversity_metrics import dc_score, negative_cosine_sim, cosine_sim
+from diversity_metrics import dc_score, negative_cosine_sim, cosine_sim, style_cosine_sim
 import random
 import json
 
@@ -14,21 +15,25 @@ load_dotenv(".env")
 def metric(gold, pred, trace=None):
     computed_dc_score = dc_score(pred.seen_data + pred.generated_data)
     computed_cos_score = cosine_sim(gold.gold_examples, pred.curr_gens)
+    computed_style_cos_score = style_cosine_sim(gold.gold_examples, pred.curr_gens)
     if computed_cos_score > 0.6:
         computed_cos_score = 1
     elif computed_cos_score < 0.4:
         computed_cos_score = 1
     computed_neg_cos_sim = negative_cosine_sim(pred.seen_data + pred.generated_data)
-    overall_score = computed_dc_score - computed_cos_score + computed_neg_cos_sim
+    overall_score = computed_dc_score - computed_cos_score + computed_neg_cos_sim + computed_style_cos_score
     return overall_score
 
 def metric_separate(gold, pred):
     computed_dc_score = dc_score(pred.seen_data + pred.generated_data)
     computed_cos_score = cosine_sim(gold.gold_examples, pred.curr_gens)
     computed_neg_cos_sim = negative_cosine_sim(pred.seen_data + pred.generated_data)
+    computed_style_cos_score = style_cosine_sim(gold.gold_examples, pred.curr_gens)
+    
     return dspy.Prediction(
         diversity_score=computed_dc_score,
         cosine_sim_ref_pred=computed_cos_score,
+        style_cosine_sim_ref=computed_style_cos_score,
         diversity_cos_score=computed_neg_cos_sim
     )
 
@@ -36,13 +41,15 @@ def gepa_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
     metric_score = metric_separate(gold, pred)
     overall_score = metric(gold, pred, trace)
     
-    feedback_text = f"The overall score is {overall_score:.2f}, which computed as the cosine similarity between the in-context gold examples and generations ({metric_score.cosine_sim_ref_pred: .2f}) subtracted from the sum of two diversity scores (DC Score = {metric_score.diversity_score: .2f}, Negative Cosine Similarity = {metric_score.diversity_cos_score: .2f}). Try to improve the diversity of your response. The generations should be sufficiently similar to the in-context gold examples without being too similar."
+    feedback_text = f"The overall score is {overall_score:.2f}, which computed as the cosine similarity between the in-context gold examples and generations ({metric_score.cosine_sim_ref_pred: .2f}) subtracted from the sum of two diversity scores (DC Score = {metric_score.diversity_score: .2f}, Negative Cosine Similarity = {metric_score.diversity_cos_score: .2f}) and Stylistic Cosine Similarity = {metric_score.style_cosine_sim_ref: .2f}. Try to improve the diversity of your response. The generations should be sufficiently similar to the in-context gold examples without being too similar."
     if metric_score.cosine_sim_ref_pred > 0.6:
         feedback_text += " The current cosine similarity between the in-context gold examples and the generations is too high. Aim to be more creative in the generations while adhering to the hard requirements."
         metric_score.cosine_sim_ref_pred = -10
     elif metric_score.cosine_sim_ref_pred < 0.4:
         feedback_text += " The current cosine similarity between the in-context gold examples and the generations is too low. Adhere to the hard requirements and still have generations to be sufficiently similar to the gold examples."
         metric_score.cosine_sim_ref_pred = -1
+    if metric_score.style_cosine_sim_ref < 0.3:
+        feedback_text += " The gold examples and the generations are not sufficiently stylistically similar."
     return dspy.Prediction(
         score=overall_score,
         feedback=feedback_text,

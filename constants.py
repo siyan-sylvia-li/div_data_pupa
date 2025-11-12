@@ -1,0 +1,1 @@
+PUPA_REQUIREMENT = "User query and the corresponding assistant response. User queries must contain personally identifiable information, such as names, addresses, nationalities, company names, and other named entities that would result in identifying the user."

@@ -29,8 +29,7 @@ if __name__ == "__main__":
     lm = dspy.LM("gpt-4.1-nano")
     dspy.configure(lm=lm)
     
-    PUPA_REQUIREMENT = "User queries must contain personally identifiable information, such as names, addresses, nationalities, company names, and other named entities that would result in identifying the user."
-    
+    from constants import PUPA_REQUIREMENT
     task_gen = OptDiverseDataGenerator()
     
     # Start creating actual data for opt

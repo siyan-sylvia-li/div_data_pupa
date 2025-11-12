@@ -12,24 +12,22 @@ import copy
 import pandas
 from data_quality_judges import DataQualityJudge
 
+from constants import PUPA_REQUIREMENT
+
 import copy
 from copy import deepcopy
 
-class SharedList(list):
-    """
-    A list subclass that prevents itself from being deep-copied.
+class DataShareSingleton():
+    def __init__(self):
+        self.generated_data = []
+        self.seen_examples = []
     
-    Instead of creating a new copy, it returns a reference to itself,
-    ensuring all objects that "copy" it continue to share the
-    same list instance.
-    """
-    def __deepcopy__(self, memo):
-        # 'memo' is a dictionary used by deepcopy to track
-        # already-copied objects.
-        
-        # We simply return 'self' to signal that the "copy"
-        # is just the original object.
-        return self
+singleton = DataShareSingleton()
+
+def set_singleton(generated_data, seen_examples):
+    global singleton
+    singleton.generated_data = generated_data
+    singleton.seen_examples = seen_examples
 
 random.seed(42)
 
@@ -84,8 +82,8 @@ class DiverseDataGenerator(dspy.Module):
 class OptDiverseDataGenerator(dspy.Module):
     def __init__(self, callbacks=None):
         super().__init__(callbacks)
-        self.seen_examples = []
-        self.generated_data = []
+        self.seen_examples = singleton.seen_examples
+        self.generated_data = singleton.generated_data
         
         self.data_summary = None
         self.summarizer = dspy.ChainOfThought(ExampleSummarizer)
@@ -142,8 +140,6 @@ if __name__ == "__main__":
     
     lm = dspy.LM("gpt-4.1")
     dspy.configure(lm=lm)
-    
-    PUPA_REQUIREMENT = "User queries must contain personally identifiable information, such as names, addresses, nationalities, company names, and other named entities that would result in identifying the user."
     
     task_gen = DiverseDataGenerator(examples=all_examples, hard_requirement=PUPA_REQUIREMENT)
     data_judge = DataQualityJudge(hard_requirement=PUPA_REQUIREMENT)

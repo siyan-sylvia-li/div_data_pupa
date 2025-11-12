@@ -22,13 +22,15 @@ class DataShareSingleton():
     def __init__(self):
         self.generated_data = []
         self.seen_examples = []
+        self.data_summary = "No data has been generated yet."
     
 singleton = DataShareSingleton()
 
-def set_singleton(generated_data, seen_examples):
+def set_singleton(generated_data, seen_examples, data_summary):
     global singleton
     singleton.generated_data = generated_data
     singleton.seen_examples = seen_examples
+    singleton.data_summary = data_summary
 
 random.seed(42)
 
@@ -87,7 +89,7 @@ class OptDiverseDataGenerator(dspy.Module):
         self.seen_examples = singleton.seen_examples
         self.generated_data = singleton.generated_data
         
-        self.data_summary = "No data has been generated yet."
+        self.data_summary = singleton.data_summary
         self.summarizer = dspy.ChainOfThought(ExampleSummarizer)
         self.proposer = dspy.ChainOfThought(DataCreator)
         self.rewriter = dspy.ChainOfThought(Rewriter)
@@ -122,7 +124,8 @@ class OptDiverseDataGenerator(dspy.Module):
         return dspy.Prediction(
             generated_data=self.generated_data,
             seen_data=self.seen_examples,
-            curr_gens=generations
+            curr_gens=generations,
+            data_summary=self.data_summary
         )
     
 

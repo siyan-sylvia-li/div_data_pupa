@@ -139,7 +139,7 @@ if __name__ == "__main__":
             data_gen = optimizer.compile(data_gen, trainset=train_set[args.bsize * iter:args.bsize * (iter + 1)])
     
     final_score = final_metric(
-        train_set, data_gen.generated_data
+        all_examples, data_gen.generated_data
     )
     final_score.update({
         "data_size": len(data_gen.generated_data)

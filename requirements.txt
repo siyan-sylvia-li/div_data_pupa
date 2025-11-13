@@ -1,0 +1,4 @@
+git+https://github.com/stanfordnlp/dspy.git
+sentence-transformers
+torch
+pandas

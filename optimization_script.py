@@ -99,7 +99,7 @@ if __name__ == "__main__":
             curr_example = "User Query: " + row["user_query"] + "\nAssistant Response: " + row["target_response"]
             all_examples.append(curr_example)    
 
-    lm = dspy.LM("gpt-4.1", cache=True)
+    lm = dspy.LM("gpt-4.1-nano", cache=True)
     dspy.configure(lm=lm)
 
     from constants import PUPA_REQUIREMENT
@@ -120,8 +120,9 @@ if __name__ == "__main__":
     else:
         optimizer = SIMBA(metric=metric, max_steps=1, bsize=args.bsize)
     for iter in range(args.num_iters):
-        data_gen = optimizer.compile(data_gen, trainset=train_set[args.bsize * iter:args.bsize * (iter + 1)], valset=dev_set[args.bsize * iter:args.bsize * (iter + 1)])
+        
         if args.optimizer == "gepa":
+            data_gen = optimizer.compile(data_gen, trainset=train_set[args.bsize * iter:args.bsize * (iter + 1)], valset=dev_set[args.bsize * iter:args.bsize * (iter + 1)])
             gen_data_max_len, gen_data, seen_data = 0, [], []
             data_summary = None
             for k in data_gen.detailed_results.best_outputs_valset:
@@ -134,6 +135,8 @@ if __name__ == "__main__":
             data_gen.generated_data = gen_data
             data_gen.seen_data = seen_data
             data_gen.data_summary = data_summary
+        else:
+            data_gen = optimizer.compile(data_gen, trainset=train_set[args.bsize * iter:args.bsize * (iter + 1)])
     
     final_score = final_metric(
         train_set, data_gen.generated_data

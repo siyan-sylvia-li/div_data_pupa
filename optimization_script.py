@@ -24,9 +24,9 @@ from datetime import datetime
 
 def final_metric(reference, gens):
     computed_dc_score = dc_score(reference + gens)
-    computed_cos_score = cosine_sim(reference, gens)
-    computed_style_cos_score = cosine_sim(reference, gens)
-    computed_neg_cos_sim = negative_cosine_sim(reference + gens)
+    computed_cos_score = float(cosine_sim(reference, gens))
+    computed_style_cos_score = float(cosine_sim(reference, gens))
+    computed_neg_cos_sim = float(negative_cosine_sim(reference + gens))
     return {
         "dc_score": computed_dc_score,
         "cosine_sim": computed_cos_score,

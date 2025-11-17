@@ -120,7 +120,6 @@ class OptDiverseDataGenerator(dspy.Module):
         self.generated_data.extend(generations)
         self.generated_data = list(set(self.generated_data))
         self.seen_examples = list(set(self.seen_examples))
-        print(self.generated_data)
         return dspy.Prediction(
             generated_data=self.generated_data,
             seen_data=self.seen_examples,

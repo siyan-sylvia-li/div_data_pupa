@@ -11,6 +11,7 @@ import dotenv
 dotenv.load_dotenv(".env")
 
 import os
+import math
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 
@@ -60,6 +61,42 @@ def dc_score(sents):
     # calculate dcscore based on embedding
     dataset_dcscore = dcscore_evaluator.calculate_dcscore_by_embedding(embeddings, kernel_type=kernel_type, tau=tau)
     return dataset_dcscore
+
+def brevity_penalty(
+    candidate_length: int,
+    reference_length: int
+) -> float:
+    """
+    Calculate BLEU-style brevity penalty.
+    
+    The brevity penalty (BP) is defined as:
+    - BP = 1 if candidate_length > reference_length
+    - BP = exp(1 - reference_length/candidate_length) if candidate_length <= reference_length
+    
+    Args:
+        candidate_length: Length of the candidate/generated text
+        reference_length: Length of the reference text
+    
+    Returns:
+        Brevity penalty value between 0 and 1
+    
+    Examples:
+        >>> brevity_penalty(12, 12)  # Same length
+        1.0
+        >>> brevity_penalty(15, 12)  # Candidate longer
+        1.0
+        >>> brevity_penalty(8, 12)   # Candidate shorter
+        0.6065306597126334
+    """
+    if candidate_length >= reference_length:
+        return 1.0
+    
+    if candidate_length == 0:
+        return 0.0
+    
+    return math.exp(1 - reference_length / candidate_length)
+
+
 
 
 if __name__ == "__main__":

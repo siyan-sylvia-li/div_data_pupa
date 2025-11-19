@@ -19,8 +19,44 @@ from argparse import ArgumentParser
 from dotenv import load_dotenv
 load_dotenv(".env")
 import os
+import math
 
 from datetime import datetime
+
+
+def brevity_penalty(
+    candidate_length: int,
+    reference_length: int
+) -> float:
+    """
+    Calculate BLEU-style brevity penalty.
+    
+    The brevity penalty (BP) is defined as:
+    - BP = 1 if candidate_length > reference_length
+    - BP = exp(1 - reference_length/candidate_length) if candidate_length <= reference_length
+    
+    Args:
+        candidate_length: Length of the candidate/generated text
+        reference_length: Length of the reference text
+    
+    Returns:
+        Brevity penalty value between 0 and 1
+    
+    Examples:
+        >>> brevity_penalty(12, 12)  # Same length
+        1.0
+        >>> brevity_penalty(15, 12)  # Candidate longer
+        1.0
+        >>> brevity_penalty(8, 12)   # Candidate shorter
+        0.6065306597126334
+    """
+    if candidate_length >= reference_length:
+        return 1.0
+    
+    if candidate_length == 0:
+        return 0.0
+    
+    return math.exp(1 - reference_length / candidate_length)
 
 def final_metric(reference, gens):
     computed_dc_score = dc_score(reference + gens)
@@ -45,7 +81,13 @@ def metric(gold, pred, trace=None):
     elif computed_cos_score < 0.4:
         computed_cos_score = 1
     computed_neg_cos_sim = negative_cosine_sim(pred.seen_data + pred.generated_data)
-    overall_score = computed_dc_score - computed_cos_score + computed_neg_cos_sim + computed_style_cos_score
+    all_brevity_penalty = []
+    for g in gold.gold_examples:
+        for p in pred.curr_gens:
+            brevity = brevity_penalty(len(p.split()), len(g.split()))
+            all_brevity_penalty.append(brevity)
+    brevity_score = sum(all_brevity_penalty) / len(all_brevity_penalty)
+    overall_score = computed_dc_score - computed_cos_score + computed_neg_cos_sim + computed_style_cos_score + brevity_score
     return overall_score
 
 def metric_separate(gold, pred):

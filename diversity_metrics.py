@@ -14,6 +14,10 @@ import os
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 
+dspy.configure_cache(
+    disk_cache_dir="/ocean/projects/cis250134p/shared"
+)
+
 from sentence_transformers import SentenceTransformer
 
 # Load an extremely efficient local model for retrieval

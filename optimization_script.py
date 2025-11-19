@@ -23,6 +23,10 @@ import math
 
 from datetime import datetime
 
+dspy.configure_cache(
+    disk_cache_dir="/ocean/projects/cis250134p/shared"
+)
+
 
 def brevity_penalty(
     candidate_length: int,

@@ -14,7 +14,6 @@ from transformers import (
     BitsAndBytesConfig,
 )
 from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead
-from trl.core import LengthSampler
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from datasets import load_dataset
 from typing import List, Dict, Optional, Callable, Union

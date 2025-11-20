@@ -187,7 +187,7 @@ if __name__ == "__main__":
     chat_adapter = ChatAdapter()
 
     trainer = GRPOTrainer(
-        model="Qwen/Qwen2-0.5B-Instruct",
+        model="Qwen/Qwen2.5-1.5B-Instruct",
         reward_funcs=diversity_reward,
         train_dataset=train_dataset
     )

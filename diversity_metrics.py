@@ -13,8 +13,6 @@ dotenv.load_dotenv(".env")
 import os
 import math
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
-
 dspy.configure_cache(
     disk_cache_dir="/ocean/projects/cis250134p/shared"
 )

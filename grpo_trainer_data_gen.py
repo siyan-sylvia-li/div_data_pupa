@@ -177,9 +177,7 @@ if __name__ == "__main__":
     trainer = GRPOTrainer(
         model="Qwen/Qwen2-0.5B-Instruct",
         reward_funcs=diversity_reward,
-        train_dataset=train_dataset,
-        test_dataset=test_dataset
-        # args=grpo_config
+        train_dataset=train_dataset
     )
     
     dynamic_callback = DynamicPromptDataGenCallback(trainer=trainer)

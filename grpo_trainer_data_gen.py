@@ -3,12 +3,15 @@ from trl import GRPOTrainer, GRPOConfig
 from typing import Optional
 from diversity_metrics import *
 from thefuzz import fuzz
-from transformers import TrainerCallback
+from transformers import TrainerCallback, AutoModelForCausalLM, AutoTokenizer
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from transformers import BitsAndBytesConfig
 import torch
 import random
 from diversity_gen import ExampleSummarizer, DataCreator
 from dspy.adapters import ChatAdapter
 from dspy.utils.exceptions import AdapterParseError
+import json
 
 
 class DynamicPromptDataGenCallback(TrainerCallback):
@@ -175,27 +178,199 @@ def diversity_reward(completions: list[list[dict[str, str]]], golden_examples: l
 
     return rewards
 
+
+def load_model_with_peft(
+    model_name: str,
+    use_lora: bool = True,
+    use_4bit: bool = True,
+    use_8bit: bool = False,
+    lora_r: int = 16,
+    lora_alpha: int = 32,
+    lora_dropout: float = 0.05,
+    lora_target_modules: Optional[list[str]] = None,
+):
+    """
+    Load model with PEFT (LoRA) for efficient fine-tuning
+
+    Args:
+        model_name: HuggingFace model name or path
+        use_lora: Whether to use LoRA
+        use_4bit: Use 4-bit quantization (requires bitsandbytes)
+        use_8bit: Use 8-bit quantization (requires bitsandbytes)
+        lora_r: LoRA rank
+        lora_alpha: LoRA alpha scaling parameter
+        lora_dropout: LoRA dropout rate
+        lora_target_modules: Which modules to apply LoRA to (None = auto-detect)
+
+    Returns:
+        model: The prepared model (quantized + LoRA if configured)
+        tokenizer: The tokenizer
+    """
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Configure quantization
+    quantization_config = None
+    if use_4bit:
+        print("Loading model with 4-bit quantization...")
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+        )
+    elif use_8bit:
+        print("Loading model with 8-bit quantization...")
+        quantization_config = BitsAndBytesConfig(
+            load_in_8bit=True,
+        )
+
+    # Load model
+    print(f"Loading model: {model_name}")
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        quantization_config=quantization_config,
+        device_map="auto",
+        trust_remote_code=True,
+        torch_dtype=torch.float16 if quantization_config else "auto",
+    )
+
+    # Prepare model for k-bit training if using quantization
+    if quantization_config is not None:
+        print("Preparing model for k-bit training...")
+        model = prepare_model_for_kbit_training(model)
+
+    # Apply LoRA
+    if use_lora:
+        print("Applying LoRA configuration...")
+
+        # Auto-detect target modules if not specified
+        if lora_target_modules is None:
+            # Common target modules for different model architectures
+            if "qwen" in model_name.lower():
+                lora_target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]
+            elif "llama" in model_name.lower():
+                lora_target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]
+            elif "mistral" in model_name.lower():
+                lora_target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]
+            elif "phi" in model_name.lower():
+                lora_target_modules = ["q_proj", "k_proj", "v_proj", "dense"]
+            else:
+                # Default fallback
+                lora_target_modules = ["q_proj", "v_proj"]
+
+        lora_config = LoraConfig(
+            r=lora_r,
+            lora_alpha=lora_alpha,
+            target_modules=lora_target_modules,
+            lora_dropout=lora_dropout,
+            bias="none",
+            task_type="CAUSAL_LM",
+        )
+
+        model = get_peft_model(model, lora_config)
+        model.print_trainable_parameters()
+
+    return model, tokenizer
+
+
 if __name__ == "__main__":
+    # Configuration flags
+    USE_PEFT = True  # Set to False to disable PEFT/LoRA
+    USE_4BIT = True  # Use 4-bit quantization (reduces memory by ~4x)
+    USE_8BIT = False  # Use 8-bit quantization (reduces memory by ~2x)
+
+    # LoRA configuration
+    LORA_R = 16  # LoRA rank (higher = more parameters, better but slower)
+    LORA_ALPHA = 32  # LoRA alpha (typically 2x rank)
+    LORA_DROPOUT = 0.05
+    LORA_TARGET_MODULES = None  # Auto-detect, or specify: ["q_proj", "v_proj", ...]
+
+    # Load datasets
     train_json = json.load(open("training_data.json"))
     test_json = json.load(open("test_data.json"))
     train_dataset = Dataset.from_dict(train_json)
     test_dataset = Dataset.from_dict(test_json)
-    
-    # grpo_config = GRPOConfig(
-    #     use_vllm=True,
-    #     vllm_mode="server",
-    #     vllm_server_port=3000
-    # )
-    
+
+    # GRPO configuration
+    grpo_config = GRPOConfig(
+        per_device_train_batch_size=2,
+        gradient_accumulation_steps=4,  # Effective batch size = 2 * 4 = 8
+        learning_rate=1e-6,  # Lower LR for LoRA fine-tuning
+        num_train_epochs=3,
+        do_eval=False,
+        do_train=True,
+        output_dir="trained_qwen_peft/",
+        overwrite_output_dir=True,
+        torch_empty_cache_steps=50,
+        save_strategy="steps",
+        save_steps=100,
+        logging_steps=10,
+        # Mixed precision training (recommended with quantization)
+        bf16=torch.cuda.is_bf16_supported(),
+        fp16=not torch.cuda.is_bf16_supported(),
+    )
+
     chat_adapter = ChatAdapter()
 
-    trainer = GRPOTrainer(
-        model="Qwen/Qwen2.5-1.5B-Instruct",
-        reward_funcs=diversity_reward,
-        train_dataset=train_dataset
-    )
-    
+    # Load model with PEFT
+    if USE_PEFT:
+        print("=" * 60)
+        print("Loading model with PEFT (LoRA) for efficient training")
+        print("=" * 60)
+        model, tokenizer = load_model_with_peft(
+            model_name="Qwen/Qwen2.5-1.5B-Instruct",
+            use_lora=True,
+            use_4bit=USE_4BIT,
+            use_8bit=USE_8BIT,
+            lora_r=LORA_R,
+            lora_alpha=LORA_ALPHA,
+            lora_dropout=LORA_DROPOUT,
+            lora_target_modules=LORA_TARGET_MODULES,
+        )
+
+        trainer = GRPOTrainer(
+            model=model,
+            processing_class=tokenizer,
+            reward_funcs=diversity_reward,
+            train_dataset=train_dataset,
+            args=grpo_config
+        )
+    else:
+        # Standard training without PEFT
+        print("=" * 60)
+        print("Loading model without PEFT (full fine-tuning)")
+        print("=" * 60)
+        trainer = GRPOTrainer(
+            model="Qwen/Qwen2.5-1.5B-Instruct",
+            reward_funcs=diversity_reward,
+            train_dataset=train_dataset,
+            args=grpo_config
+        )
+
+    # Add dynamic callback
     dynamic_callback = DynamicPromptDataGenCallback(trainer=trainer)
     trainer.add_callback(dynamic_callback)
+
+    # Train
+    print("=" * 60)
+    print("Starting training...")
+    print("=" * 60)
     trainer.train()
-    trainer.save_model("trained_qwen_05b/")
+
+    # Save model
+    print("=" * 60)
+    print("Saving model...")
+    print("=" * 60)
+    if USE_PEFT:
+        # Save LoRA adapters
+        trainer.model.save_pretrained("trained_qwen_peft/lora_adapters")
+        tokenizer.save_pretrained("trained_qwen_peft/lora_adapters")
+        print(f"LoRA adapters saved to trained_qwen_peft/lora_adapters/")
+        print("To load: model = AutoModelForCausalLM.from_pretrained('base_model')")
+        print("         model = PeftModel.from_pretrained(model, 'trained_qwen_peft/lora_adapters')")
+    else:
+        trainer.save_model("trained_qwen_peft/full_model")
+        print(f"Full model saved to trained_qwen_peft/full_model/")

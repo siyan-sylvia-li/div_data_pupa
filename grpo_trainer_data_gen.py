@@ -90,7 +90,7 @@ class DynamicPromptDataGenCallback(TrainerCallback):
             summary = chat_adapter.parse(ExampleSummarizer, summary)["summary"]
         except AdapterParseError:
             summary = data_storage.data_summary
-
+        print(summary)
         return summary.strip()
     
     def _update_prompts_with_summary(self, summary: str):
@@ -153,7 +153,6 @@ def diversity_reward(completions: list[list[dict[str, str]]], golden_examples: l
     contents = [completion[0]["content"] for completion in completions]
     rewards = []
     for content, gold, pii in zip(contents, golden_examples, pii_integration):
-        print(content)
         gold = gold.split("|||")
         data_storage.seen_examples.extend(gold)
         data_storage.seen_examples = list(set(data_storage.seen_examples))
@@ -163,6 +162,7 @@ def diversity_reward(completions: list[list[dict[str, str]]], golden_examples: l
             rewards.append(0)
             continue
         data_storage.generated_data.extend(gen_data)
+        print(gen_data)
         # content = content.split("|||")
         if pii:
             reward = diversity_metric(gold, gen_data) + fuzz.partial_token_set_ratio(pii, content) / 100.0

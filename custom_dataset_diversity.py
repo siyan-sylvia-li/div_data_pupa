@@ -24,14 +24,14 @@ if __name__ == "__main__":
     test_set = []
 
     for _ in range(1000):
-        train_set.append({"gold_examples": random.choices(all_examples, k=3), 
-                          "curr_summary": "<SUMMARY>",
-                          "hard_requirement": PUPA_REQUIREMENT})
-    
+        train_set.append({"examples": random.choices(all_examples, k=3), 
+                        "data_summary": "<SUMMARY>",
+                        "requirement": PUPA_REQUIREMENT})
+
     for _ in range(200):
-        test_set.append({"gold_examples": random.choices(all_examples, k=3), 
-                         "curr_summary": "<SUMMARY>",
-                         "hard_requirement": PUPA_REQUIREMENT})
+        test_set.append({"examples": random.choices(all_examples, k=3), 
+                        "data_summary": "<SUMMARY>",
+                        "requirement": PUPA_REQUIREMENT})
     
     chat_adapter = ChatAdapter()
     

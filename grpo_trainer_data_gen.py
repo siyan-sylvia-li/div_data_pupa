@@ -161,6 +161,9 @@ def diversity_reward(completions: list[list[dict[str, str]]], golden_examples: l
         except AdapterParseError:
             rewards.append(0)
             continue
+        if len(gen_data) == 0:
+            rewards.append(0)
+            continue
         data_storage.generated_data.extend(gen_data)
         print(gen_data)
         # content = content.split("|||")

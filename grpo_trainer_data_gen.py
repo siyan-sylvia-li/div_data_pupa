@@ -167,6 +167,9 @@ def diversity_reward(completions: list[list[dict[str, str]]], golden_examples: l
         if len(gen_data) == 0:
             rewards.append(0)
             continue
+        if not ("User Query:" in content and "Assistant Response:" in content):
+            rewards.append(0)
+            continue
         data_storage.generated_data.extend(gen_data)
         print(gen_data)
         # content = content.split("|||")
@@ -327,6 +330,7 @@ if __name__ == "__main__":
         # Gradient checkpointing for memory efficiency
         gradient_checkpointing=True,
         gradient_checkpointing_kwargs={"use_reentrant": False},
+        max_completion_length=4000
     )
 
     chat_adapter = ChatAdapter()

@@ -18,20 +18,20 @@ class DynamicPromptDataGenCallback(TrainerCallback):
         
     def on_step_start(self, args, state, control, **kwargs):
         dataset = self.trainer.train_dataset
-        if len(data_storage.generated_data):
-            summary = self._generate_data_summary(
-                data_storage.generated_data,
-                data_storage.seen_examples
-            )
-            # Store for next round
-            data_storage.data_summary = summary
-            self.data_summaries[state.global_step] = summary
-        else:
-            self.data_summaries[state.global_step] = data_storage.data_summary
-        
         # Update prompts in dataset to include summary
         if state.global_step % 10 == 0:  # Every 50 steps
-            self._update_prompts_with_summary(data_storage.data_summary)
+            if len(data_storage.generated_data):
+                summary = self._generate_data_summary(
+                    data_storage.generated_data,
+                    data_storage.seen_examples
+                )
+                # Store for next round
+                data_storage.data_summary = summary
+                self.data_summaries[state.global_step] = summary
+            else:
+                self.data_summaries[state.global_step] = data_storage.data_summary
+        self._update_prompts_with_summary(data_storage.data_summary)
+        print(data_storage.data_summary)
         
         return control
     
@@ -115,8 +115,8 @@ class DynamicPromptDataGenCallback(TrainerCallback):
 
 class DataShareSingleton():
     def __init__(self):
-        self.generated_data = set()
-        self.seen_examples = set()
+        self.generated_data = []
+        self.seen_examples = []
         self.data_summary = "No data has been generated yet."
     
 data_storage = DataShareSingleton()

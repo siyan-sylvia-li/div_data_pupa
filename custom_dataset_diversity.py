@@ -40,13 +40,13 @@ if __name__ == "__main__":
     for t in train_set:
         pr = chat_adapter.format(DataCreator, demos=[], inputs=t)
         custom_train["prompt"].append(pr)
-        custom_train["golden_examples"].append("|||".join(t["gold_examples"]))
+        custom_train["golden_examples"].append("|||".join(t["examples"]))
         custom_train["pii_integration"].append(None)
     
     for t in test_set:
         pr = chat_adapter.format(DataCreator, demos=[], inputs=t)
         custom_test["prompt"].append(pr)
-        custom_test["golden_examples"].append("|||".join(t["gold_examples"]))
+        custom_test["golden_examples"].append("|||".join(t["examples"]))
         custom_test["pii_integration"].append(None)
     
     json.dump(custom_train, open("training_data.json", "w+"))

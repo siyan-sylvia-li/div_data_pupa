@@ -49,8 +49,8 @@ if __name__ == "__main__":
         custom_test["golden_examples"].append("|||".join(t["gold_examples"]))
         custom_test["pii_integration"].append(None)
     
-    json.dump(train_set, open("training_data.json", "w+"))
-    json.dump(test_set, open("test_data.json", "w+"))
+    json.dump(custom_train, open("training_data.json", "w+"))
+    json.dump(custom_test, open("test_data.json", "w+"))
     
     
     

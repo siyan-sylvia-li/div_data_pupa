@@ -240,7 +240,12 @@ def load_model_with_peft(
     # Prepare model for k-bit training if using quantization
     if quantization_config is not None:
         print("Preparing model for k-bit training...")
-        model = prepare_model_for_kbit_training(model)
+        model = prepare_model_for_kbit_training(
+            model,
+            use_gradient_checkpointing=True
+        )
+        # Enable gradient checkpointing for memory efficiency
+        model.gradient_checkpointing_enable()
 
     # Apply LoRA
     if use_lora:
@@ -272,6 +277,13 @@ def load_model_with_peft(
 
         model = get_peft_model(model, lora_config)
         model.print_trainable_parameters()
+
+    # Fix dtype mismatch issues - ensure lm_head is in correct dtype
+    # This fixes the "expected scalar type Float but found BFloat16" error
+    if hasattr(model, 'lm_head'):
+        if quantization_config is not None:
+            # For quantized models, keep lm_head in float32 for stability
+            model.lm_head = model.lm_head.to(torch.float32)
 
     return model, tokenizer
 
@@ -308,9 +320,13 @@ if __name__ == "__main__":
         save_strategy="steps",
         save_steps=100,
         logging_steps=10,
-        # Mixed precision training (recommended with quantization)
-        bf16=torch.cuda.is_bf16_supported(),
-        fp16=not torch.cuda.is_bf16_supported(),
+        # Mixed precision training
+        # NOTE: With quantization, use fp16 instead of bf16 to avoid dtype mismatches
+        bf16=False,  # Disable bf16 when using quantization
+        fp16=True if USE_4BIT or USE_8BIT else False,
+        # Gradient checkpointing for memory efficiency
+        gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
     )
 
     chat_adapter = ChatAdapter()

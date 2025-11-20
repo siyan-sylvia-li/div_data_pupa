@@ -128,7 +128,7 @@ def set_singleton(generated_data, seen_examples, data_summary):
     data_storage.data_summary = data_summary
 
 def diversity_metric(gold_examples: list[str], pred: list[str]):
-    computed_dc_score = dc_score(data_storage.seen_data + data_storage.generated_data)
+    computed_dc_score = dc_score(data_storage.seen_examples + data_storage.generated_data)
     computed_style_cos_score = style_cosine_sim(gold_examples, pred)
     all_brevity_penalty = []
     for g in gold_examples:
@@ -147,6 +147,7 @@ def diversity_reward(completions: list[list[dict[str, str]]], golden_examples: l
     contents = [completion[0]["content"] for completion in completions]
     rewards = []
     for content, gold, pii in zip(contents, golden_examples, pii_integration):
+        print(content)
         gold = gold.split("|||")
         data_storage.seen_examples.extend(gold)
         data_storage.seen_examples = list(set(data_storage.seen_examples))

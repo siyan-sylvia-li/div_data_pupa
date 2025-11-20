@@ -8,6 +8,7 @@ import torch
 import random
 from diversity_gen import ExampleSummarizer, DataCreator
 from dspy.adapters import ChatAdapter
+from dspy.utils.exceptions import AdapterParseError
 
 
 class DynamicPromptDataGenCallback(TrainerCallback):
@@ -84,6 +85,11 @@ class DynamicPromptDataGenCallback(TrainerCallback):
             outputs[0][inputs.shape[1]:],
             skip_special_tokens=True
         )
+        
+        try:
+            summary = chat_adapter.parse(ExampleSummarizer, summary)["summary"]
+        except AdapterParseError:
+            summary = data_storage.data_summary
 
         return summary.strip()
     
@@ -151,12 +157,17 @@ def diversity_reward(completions: list[list[dict[str, str]]], golden_examples: l
         gold = gold.split("|||")
         data_storage.seen_examples.extend(gold)
         data_storage.seen_examples = list(set(data_storage.seen_examples))
-        data_storage.generated_data.extend(content.split("\n\n"))
+        try:
+            gen_data = chat_adapter.parse(DataCreator, content)["generated_instances"]
+        except AdapterParseError:
+            rewards.append(0)
+            continue
+        data_storage.generated_data.extend(gen_data)
         # content = content.split("|||")
         if pii:
-            reward = diversity_metric(gold, content.split("\n\n")) + fuzz.partial_token_set_ratio(pii, content) / 100.0
+            reward = diversity_metric(gold, gen_data) + fuzz.partial_token_set_ratio(pii, content) / 100.0
         else:
-            reward = diversity_metric(gold, content.split("\n\n"))
+            reward = diversity_metric(gold, gen_data)
         rewards.append(reward)
 
     return rewards
